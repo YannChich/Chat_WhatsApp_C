@@ -12,7 +12,7 @@ struct reactor_t;
 typedef void (*handler_t)(struct reactor_t*, int);
 
 typedef struct reactor_t{
-    struct pollfd* fds;         // Dynamically allocated array
+    struct pollfd *fds;         // Dynamically allocated array
     handler_t* handlers;        // Dynamically allocated array
     int fd_count;
     int fd_capacity;            // Current capacity of the array
@@ -24,6 +24,7 @@ reactor_t* createReactor();
 void stopReactor(reactor_t* reactor);
 void startReactor(reactor_t* reactor);
 void addFd (reactor_t* reactor, int fd,handler_t handler);
+void removeFd(reactor_t* reactor, int fd);
 void waitFor (reactor_t* reactor);
 
 #endif

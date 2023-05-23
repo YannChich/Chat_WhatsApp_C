@@ -1,13 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include "reactor.h"
 
 reactor_t* createReactor() {
-    reactor_t* reactor = malloc(sizeof(reactor_t));
+    reactor_t* reactor = (reactor_t*)malloc(sizeof(reactor_t));
     reactor->fd_capacity = 10;  // Initial capacity
-    reactor->fds = malloc(sizeof(struct pollfd) * reactor->fd_capacity);
-    reactor->handlers = malloc(sizeof(handler_t) * reactor->fd_capacity);
+    reactor->fds = (struct pollfd*)malloc(sizeof(struct pollfd) * reactor->fd_capacity);
+    reactor->handlers = (handler_t*)malloc(sizeof(handler_t) * reactor->fd_capacity);
     reactor->fd_count = 0;
     reactor->running = 0;
     return reactor;
