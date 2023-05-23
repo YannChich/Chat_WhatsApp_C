@@ -12,9 +12,10 @@ struct reactor_t;
 typedef void (*handler_t)(struct reactor_t*, int);
 
 typedef struct reactor_t{
-    struct pollfd fds[MAX_FD];
-    handler_t* handlers;   
+    struct pollfd* fds;         // Dynamically allocated array
+    handler_t* handlers;        // Dynamically allocated array
     int fd_count;
+    int fd_capacity;            // Current capacity of the array
     int running;
     pthread_t thread;
 } reactor_t;
