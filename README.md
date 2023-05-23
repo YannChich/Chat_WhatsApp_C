@@ -1,5 +1,5 @@
 # Chat_WhatsApp_C (using beej.net)
-## Project Overview
+### Project Overview
 This project is a simplified chat server that uses the reactor pattern for managing input and output. The
 server accepts connections from multiple clients and relays messages from one client to all others. It
 utilizes multi-threading to handle multiple client connections simultaneously.
