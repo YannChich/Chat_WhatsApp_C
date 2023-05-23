@@ -8,10 +8,24 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <poll.h>
+#include <signal.h>
 #include "reactor.h"
 
 #define PORT "9034"   // Port we're listening on
 
+reactor_t* global_reactor; 
+
+void signal_handler_ctlrC(int sig) {
+    printf("\n");
+    printf("---[Exit]--- :The server will shut down, all memory has been freed successfully. \n");
+    sleep(0.5);
+    stopReactor(global_reactor);
+    free(global_reactor->fds);
+    free(global_reactor->handlers);
+    free(global_reactor);
+    exit(0);
+    
+}
 // Get sockaddr, IPv4 or IPv6:
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -86,8 +100,6 @@ void handle_client(reactor_t* reactor, int client_fd)
         }
         close(client_fd);
         removeFd(reactor, client_fd);
-
-        // Here you should add functionality to remove the client from the reactor
     } else {
         // Send to everyone else
         for (int i = 0; i < reactor->fd_count; i++) {
@@ -135,12 +147,15 @@ int main(void)
         exit(1);
     }
 
-    reactor_t* reactor = createReactor();
-    addFd(reactor, listener, handle_new_connection);
+    global_reactor = createReactor();
 
-    startReactor(reactor);
+    signal(SIGINT, signal_handler_ctlrC);
 
-    waitFor(reactor);
+    addFd(global_reactor, listener, handle_new_connection);
+
+    startReactor(global_reactor);
+
+    waitFor(global_reactor);
 
     return 0;
 }
