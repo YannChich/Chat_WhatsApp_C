@@ -1,4 +1,4 @@
-# Chat_WhatsApp_C
+# Chat_WhatsApp_C (using beej.net)
 
 ## Project Overview
 This project is a simplified chat server that uses the reactor pattern for managing input and output. The
