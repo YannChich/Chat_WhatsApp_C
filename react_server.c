@@ -7,11 +7,14 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <poll.h>
 #include "reactor.h"
 
-#define PORT "9034"
+#define PORT "9034"   // Port we're listening on
 
-void *get_in_addr(struct sockaddr *sa) {
+// Get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
@@ -19,28 +22,56 @@ void *get_in_addr(struct sockaddr *sa) {
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void handleEvent(reactor_t* reactor, int fd) {
-    char buf[256];
-    int nbytes;
+// Return a listening socket
+int get_listener_socket(void)
+{
+    // Same implementation as your get_listener_socket function...
+}
 
-    struct sockaddr_storage remoteaddr;
+void handle_new_connection(reactor_t* reactor, int listener)
+{
+    struct sockaddr_storage remoteaddr; // Client address
     socklen_t addrlen;
+
     char remoteIP[INET6_ADDRSTRLEN];
-    
-    // Read data from socket
-    if ((nbytes = recv(fd, buf, sizeof buf, 0)) <= 0) {
-        // Got error or connection closed by client
+
+    addrlen = sizeof remoteaddr;
+    int newfd = accept(listener,
+        (struct sockaddr *)&remoteaddr,
+        &addrlen);
+
+    if (newfd == -1) {
+        perror("accept");
+    } else {
+        printf("react_server: new connection from %s on "
+            "socket %d\n",
+            inet_ntop(remoteaddr.ss_family,
+                get_in_addr((struct sockaddr*)&remoteaddr),
+                remoteIP, INET6_ADDRSTRLEN),
+            newfd);
+        addFd(reactor, newfd, handle_client);  // Add the new client to the reactor
+    }
+}
+
+void handle_client(reactor_t* reactor, int client_fd)
+{
+    char buf[256];
+    int nbytes = recv(client_fd, buf, sizeof buf, 0);
+
+    if (nbytes <= 0) {
         if (nbytes == 0) {
-            printf("selectserver: socket %d hung up\n", fd);
+            printf("react_server: socket %d hung up\n", client_fd);
         } else {
             perror("recv");
         }
-        close(fd); // Bye!
+        close(client_fd);
+        // Here you should add functionality to remove the client from the reactor
     } else {
-        // We got some good data from the client
+        // Send to everyone else
         for (int i = 0; i < reactor->fd_count; i++) {
-            if (reactor->fds[i].fd != fd) {
-                if (send(reactor->fds[i].fd, buf, nbytes, 0) == -1) {
+            int dest_fd = reactor->fds[i].fd;
+            if (dest_fd != client_fd && dest_fd != reactor->fds[0].fd) {
+                if (send(dest_fd, buf, nbytes, 0) == -1) {
                     perror("send");
                 }
             }
@@ -48,52 +79,17 @@ void handleEvent(reactor_t* reactor, int fd) {
     }
 }
 
-int main(void) {
-    int listener;
-    int yes=1;
-    int i, rv;
-    struct addrinfo hints, *ai, *p;
+int main(void)
+{
+    int listener = get_listener_socket();
 
-    reactor_t* reactor = createReactor();
-
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &ai)) != 0) {
-        fprintf(stderr, "selectserver: %s\n", gai_strerror(rv));
+    if (listener == -1) {
+        fprintf(stderr, "error getting listening socket\n");
         exit(1);
     }
 
-    for(p = ai; p != NULL; p = p->ai_next) {
-        listener = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (listener < 0) {
-            continue;
-        }
-
-        setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
-
-        if (bind(listener, p->ai_addr, p->ai_addrlen) < 0) {
-            close(listener);
-            continue;
-        }
-
-        break;
-    }
-
-    if (p == NULL) {
-        fprintf(stderr, "selectserver: failed to bind\n");
-        exit(2);
-    }
-
-    freeaddrinfo(ai);
-
-    if (listen(listener, 10) == -1) {
-        perror("listen");
-        exit(3);
-    }
-
-    addFd(reactor, listener, handleEvent);
+    reactor_t* reactor = createReactor();
+    addFd(reactor, listener, handle_new_connection);
 
     startReactor(reactor);
 
