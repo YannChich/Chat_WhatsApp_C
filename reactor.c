@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
-#include "st_reactor.h"
+#include "reactor.h"
 
-
-reactor_t createReactor() {
+reactor_t* createReactor() {
     reactor_t* reactor = malloc(sizeof(reactor_t));
+    reactor->handlers = malloc(sizeof(handler_t) * MAX_FD); // Allocate memory for handlers
     reactor->fd_count = 0;
     reactor->running = 0;
     return reactor;
@@ -18,7 +16,7 @@ void stopReactor(reactor_t* reactor) {
 }
 
 void* runReactor(void* arg) {
-    reactor_t* reactor = (reactor_t) arg;
+    reactor_t* reactor = (reactor_t*) arg;
     reactor->running = 1;
 
     while (reactor->running) {
@@ -29,7 +27,7 @@ void* runReactor(void* arg) {
 
         for (int i = 0; i < reactor->fd_count; i++) {
             if (reactor->fds[i].revents & POLLIN) {
-                reactor->handlers[i](reactor->fds[i].fd);
+                reactor->handlers[i](reactor, reactor->fds[i].fd);
             }
         }
     }
@@ -37,7 +35,7 @@ void* runReactor(void* arg) {
     return NULL;
 }
 
-void startReactor(reactor_t reactor) {
+void startReactor(reactor_t* reactor) {
     pthread_create(&(reactor->thread), NULL, runReactor, reactor);
 }
 

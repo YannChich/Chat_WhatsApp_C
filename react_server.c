@@ -19,40 +19,29 @@ void *get_in_addr(struct sockaddr *sa) {
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-void handleEvent(void *reactor, int fd) {
+void handleEvent(reactor_t* reactor, int fd) {
     char buf[256];
     int nbytes;
 
-    if (fd == getListener(reactor)) {
-        struct sockaddr_storage remoteaddr;
-        socklen_t addrlen;
-        char remoteIP[INET6_ADDRSTRLEN];
-        int newfd = accept(fd, (struct sockaddr *)&remoteaddr, &addrlen);
-        if (newfd == -1) {
-            perror("accept");
+    struct sockaddr_storage remoteaddr;
+    socklen_t addrlen;
+    char remoteIP[INET6_ADDRSTRLEN];
+    
+    // Read data from socket
+    if ((nbytes = recv(fd, buf, sizeof buf, 0)) <= 0) {
+        // Got error or connection closed by client
+        if (nbytes == 0) {
+            printf("selectserver: socket %d hung up\n", fd);
         } else {
-            printf("selectserver: new connection from %s on "
-                   "socket %d\n",
-                   inet_ntop(remoteaddr.ss_family, get_in_addr((struct sockaddr *)&remoteaddr),
-                             remoteIP, INET6_ADDRSTRLEN),
-                   newfd);
-            addFd(reactor, newfd, handleEvent);
+            perror("recv");
         }
+        close(fd); // Bye!
     } else {
-        if ((nbytes = recv(fd, buf, sizeof buf, 0)) <= 0) {
-            if (nbytes == 0) {
-                printf("selectserver: socket %d hung up\n", fd);
-            } else {
-                perror("recv");
-            }
-            close(fd);
-            removeFd(reactor, fd);
-        } else {
-            for (int j = 0; j < getFdCount(reactor); j++) {
-                if (getFd(reactor, j) != getListener(reactor) && getFd(reactor, j) != fd) {
-                    if (send(getFd(reactor, j), buf, nbytes, 0) == -1) {
-                        perror("send");
-                    }
+        // We got some good data from the client
+        for (int i = 0; i < reactor->fd_count; i++) {
+            if (reactor->fds[i].fd != fd) {
+                if (send(reactor->fds[i].fd, buf, nbytes, 0) == -1) {
+                    perror("send");
                 }
             }
         }
@@ -65,7 +54,7 @@ int main(void) {
     int i, rv;
     struct addrinfo hints, *ai, *p;
 
-    void* reactor = createReactor();
+    reactor_t* reactor = createReactor();
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
@@ -104,7 +93,6 @@ int main(void) {
         exit(3);
     }
 
-    setListener(reactor, listener);
     addFd(reactor, listener, handleEvent);
 
     startReactor(reactor);
