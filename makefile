@@ -1,20 +1,19 @@
-CC=gcc
-CFLAGS=-I.
-DEPS = reactor.h
-OBJ = server.o reactor.o
-LIB_NAME=st_reactor.so
-LIB_OBJ=reactor.o
+CC = gcc
+CFLAGS = -I. -fPIC
+LDFLAGS = -L. -lst_reactor -Wl,-rpath,.
 
-all: $(LIB_NAME) server
+reactor.o: reactor.c react_server
+	$(CC) $(CFLAGS) -c reactor.c -o reactor.o
 
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS) -fPIC
+libst_reactor.so: reactor.o
+	$(CC) -shared -o libst_reactor.so reactor.o
 
-$(LIB_NAME): $(LIB_OBJ)
-	$(CC) -shared -o $@ $^
+react_server.o: react_server.c
+	$(CC) $(CFLAGS) -c react_server.c -o react_server.o
 
-server: server.o $(LIB_NAME)
-	$(CC) -o $@ $^ $(CFLAGS) -L. -l:$(LIB_NAME)
-
+react_server: react_server.o libst_reactor.so
+	$(CC) -o react_server react_server.o $(LDFLAGS)
+	
+.PHONY: clean
 clean:
-	rm -f *.o server $(LIB_NAME)
+	rm -f *.o *.so react_server
